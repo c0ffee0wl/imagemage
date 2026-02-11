@@ -54,7 +54,7 @@ func runRestore(cmd *cobra.Command, args []string) error {
 	fmt.Println("Restoring and enhancing photo...")
 
 	// Generate restored image
-	restoredImageData, err := client.GenerateContentWithImage(prompt, imageBase64)
+	result, err := client.GenerateContentWithImage(prompt, imageBase64)
 	if err != nil {
 		return fmt.Errorf("failed to restore image: %w", err)
 	}
@@ -70,7 +70,7 @@ func runRestore(cmd *cobra.Command, args []string) error {
 	outputPath = filehandler.EnsureUniqueFilename(outputPath)
 
 	// Save restored image
-	if err := filehandler.SaveImage(restoredImageData, outputPath); err != nil {
+	if err := filehandler.SaveImage(result.ImageData, outputPath); err != nil {
 		return fmt.Errorf("failed to save restored image: %w", err)
 	}
 

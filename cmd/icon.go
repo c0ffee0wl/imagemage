@@ -89,11 +89,11 @@ func runIcon(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Generating base icon...")
 
-	var imageData string
+	var result gemini.GenerateResult
 	if inputImageBase64 != "" {
-		imageData, err = client.GenerateContentWithImages(prompt, []string{inputImageBase64}, "1:1")
+		result, err = client.GenerateContentWithImages(prompt, []string{inputImageBase64}, "1:1")
 	} else {
-		imageData, err = client.GenerateContentWithImages(prompt, nil, "1:1")
+		result, err = client.GenerateContentWithImages(prompt, nil, "1:1")
 	}
 	if err != nil {
 		return fmt.Errorf("failed to generate icon: %w", err)
@@ -102,11 +102,11 @@ func runIcon(cmd *cobra.Command, args []string) error {
 	// Resize and save icons at each requested size
 	successCount := 0
 	for _, size := range sizes {
-		filename := filehandler.GenerateFilename(description, fmt.Sprintf("icon_%dx%d", size, size), 0)
+		filename := filehandler.GenerateFilename(description, result.SuggestedName, fmt.Sprintf("icon_%dx%d", size, size), 0)
 		outputPath := filepath.Join(iconOutput, filename)
 		outputPath = filehandler.EnsureUniqueFilename(outputPath)
 
-		if err := filehandler.ResizeAndSaveImage(imageData, size, outputPath); err != nil {
+		if err := filehandler.ResizeAndSaveImage(result.ImageData, size, outputPath); err != nil {
 			fmt.Printf("Error saving %dx%d icon: %v\n", size, size, err)
 			continue
 		}

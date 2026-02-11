@@ -58,18 +58,18 @@ func runPattern(cmd *cobra.Command, args []string) error {
 	}
 
 	// Generate pattern
-	imageData, err := client.GenerateContent(prompt)
+	result, err := client.GenerateContent(prompt)
 	if err != nil {
 		return fmt.Errorf("failed to generate pattern: %w", err)
 	}
 
-	// Generate filename
-	filename := filehandler.GenerateFilename(description, "pattern", 0)
+	// Generate filename (prefer AI-suggested name)
+	filename := filehandler.GenerateFilename(description, result.SuggestedName, "pattern", 0)
 	outputPath := filepath.Join(patternOutput, filename)
 	outputPath = filehandler.EnsureUniqueFilename(outputPath)
 
 	// Save pattern
-	if err := filehandler.SaveImage(imageData, outputPath); err != nil {
+	if err := filehandler.SaveImage(result.ImageData, outputPath); err != nil {
 		return fmt.Errorf("failed to save pattern: %w", err)
 	}
 

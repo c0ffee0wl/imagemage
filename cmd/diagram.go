@@ -51,18 +51,18 @@ func runDiagram(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Generating %s: %s\n", diagramType, description)
 
 	// Generate diagram
-	imageData, err := client.GenerateContent(prompt)
+	result, err := client.GenerateContent(prompt)
 	if err != nil {
 		return fmt.Errorf("failed to generate diagram: %w", err)
 	}
 
-	// Generate filename
-	filename := filehandler.GenerateFilename(description, diagramType, 0)
+	// Generate filename (prefer AI-suggested name)
+	filename := filehandler.GenerateFilename(description, result.SuggestedName, diagramType, 0)
 	outputPath := filepath.Join(diagramOutput, filename)
 	outputPath = filehandler.EnsureUniqueFilename(outputPath)
 
 	// Save diagram
-	if err := filehandler.SaveImage(imageData, outputPath); err != nil {
+	if err := filehandler.SaveImage(result.ImageData, outputPath); err != nil {
 		return fmt.Errorf("failed to save diagram: %w", err)
 	}
 

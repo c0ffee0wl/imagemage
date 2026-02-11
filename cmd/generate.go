@@ -171,18 +171,18 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		}
 
 		// Generate image with resolution support
-		imageData, err := client.GenerateContentWithResolution(fullPrompt, generateResolution, generateAspectRatio)
+		result, err := client.GenerateContentWithResolution(fullPrompt, generateResolution, generateAspectRatio)
 		if err != nil {
 			fmt.Printf("Error generating image %d: %v\n", i, err)
 			continue
 		}
 
-		// Generate filename
+		// Generate filename (prefer AI-suggested name)
 		var filename string
 		if generateCount > 1 {
-			filename = filehandler.GenerateFilename(prompt, "", i)
+			filename = filehandler.GenerateFilename(prompt, result.SuggestedName, "", i)
 		} else {
-			filename = filehandler.GenerateFilename(prompt, "", 0)
+			filename = filehandler.GenerateFilename(prompt, result.SuggestedName, "", 0)
 		}
 
 		// Create output path
@@ -190,7 +190,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		outputPath = filehandler.EnsureUniqueFilename(outputPath)
 
 		// Save image
-		if err := filehandler.SaveImage(imageData, outputPath); err != nil {
+		if err := filehandler.SaveImage(result.ImageData, outputPath); err != nil {
 			fmt.Printf("Error saving image %d: %v\n", i, err)
 			continue
 		}

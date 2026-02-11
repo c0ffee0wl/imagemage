@@ -79,19 +79,19 @@ func runStory(cmd *cobra.Command, args []string) error {
 		fmt.Printf("[%d/%d] Generating frame...\n", i, storyFrames)
 
 		// Generate image
-		imageData, err := client.GenerateContent(prompt)
+		result, err := client.GenerateContent(prompt)
 		if err != nil {
 			fmt.Printf("Error generating frame %d: %v\n", i, err)
 			continue
 		}
 
-		// Generate filename
-		filename := filehandler.GenerateFilename(narrative, fmt.Sprintf("story_frame_%02d", i), 0)
+		// Generate filename (prefer AI-suggested name, with frame prefix)
+		filename := filehandler.GenerateFilename(narrative, result.SuggestedName, fmt.Sprintf("story_frame_%02d", i), 0)
 		outputPath := filepath.Join(storyOutput, filename)
 		outputPath = filehandler.EnsureUniqueFilename(outputPath)
 
 		// Save image
-		if err := filehandler.SaveImage(imageData, outputPath); err != nil {
+		if err := filehandler.SaveImage(result.ImageData, outputPath); err != nil {
 			fmt.Printf("Error saving frame %d: %v\n", i, err)
 			continue
 		}

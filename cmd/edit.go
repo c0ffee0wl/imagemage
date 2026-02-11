@@ -189,11 +189,11 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	fmt.Println("\nGenerating edited image...")
 
 	// Generate with all images
-	var editedImageData string
+	var result gemini.GenerateResult
 	if editResolution != "" || editAspectRatio != "" {
-		editedImageData, err = client.GenerateContentWithFullOptions(instruction, allImagesBase64, editResolution, editAspectRatio)
+		result, err = client.GenerateContentWithFullOptions(instruction, allImagesBase64, editResolution, editAspectRatio)
 	} else {
-		editedImageData, err = client.GenerateContentWithImages(instruction, allImagesBase64, "")
+		result, err = client.GenerateContentWithImages(instruction, allImagesBase64, "")
 	}
 
 	if err != nil {
@@ -201,7 +201,7 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Save edited image
-	if err := filehandler.SaveImage(editedImageData, outputPath); err != nil {
+	if err := filehandler.SaveImage(result.ImageData, outputPath); err != nil {
 		return fmt.Errorf("failed to save edited image: %w", err)
 	}
 
