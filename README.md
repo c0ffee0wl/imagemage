@@ -263,10 +263,12 @@ imagemage/
 │   ├── story.go           # Sequential image generation
 │   └── diagram.go         # Diagram generation
 ├── pkg/
-│   ├── gemini/            # Gemini API client
+│   ├── gemini/            # Gemini API client (returns images + AI-suggested filenames)
 │   │   └── client.go
-│   └── filehandler/       # File handling utilities
-│       └── filehandler.go
+│   ├── filehandler/       # File handling and smart filename generation
+│   │   └── filehandler.go
+│   └── metadata/          # PNG metadata handling
+│       └── png.go
 ├── go.mod                 # Go module definition
 └── README.md             # This file
 ```
@@ -278,8 +280,9 @@ It's refreshingly simple, actually:
 1. **API Client** (`pkg/gemini`): Handles authentication and talks to Google's Gemini API directly
 2. **Request Formation**: Your prompt becomes a JSON request. No middleware, no abstraction layers, no "enterprise service mesh."
 3. **Response Processing**: Images come back as base64-encoded data, get decoded, done.
-4. **File Management** (`pkg/filehandler`): Generates sane filenames and saves files without overwriting things accidentally
-5. **Commands**: Each command is a focused interface for a specific task. No feature creep, no "we added AI to your AI."
+4. **File Management** (`pkg/filehandler`): Saves files without overwriting things accidentally
+5. **Smart Filenames**: The AI suggests short, evocative filenames for each image (like `ember_wyrm.png` instead of `a_majestic_dragon_breathing_fire_over_a_medieval_c.png`). Falls back to truncated prompts if the AI gets creative in unhelpful ways
+6. **Commands**: Each command is a focused interface for a specific task. No feature creep, no "we added AI to your AI."
 
 ## When Things Go Wrong
 
