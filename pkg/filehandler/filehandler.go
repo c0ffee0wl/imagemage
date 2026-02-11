@@ -41,15 +41,19 @@ func SaveImage(imageData, outputPath string) error {
 	return nil
 }
 
-// GenerateFilename creates a descriptive filename from a prompt
-func GenerateFilename(prompt, prefix string, count int) string {
-	// Clean the prompt to make it filename-friendly
-	cleaned := cleanPrompt(prompt)
+// GenerateFilename creates a descriptive filename from a prompt or suggested name
+func GenerateFilename(prompt, suggestedName, prefix string, count int) string {
+	// Try to use AI-suggested name first
+	cleaned := validateSuggestedName(suggestedName)
 
-	// Truncate if too long
-	maxLen := 50
-	if len(cleaned) > maxLen {
-		cleaned = cleaned[:maxLen]
+	// Fall back to prompt-based name
+	if cleaned == "" {
+		cleaned = cleanPrompt(prompt)
+		// Truncate if too long
+		maxLen := 50
+		if len(cleaned) > maxLen {
+			cleaned = cleaned[:maxLen]
+		}
 	}
 
 	// Build filename
@@ -85,6 +89,28 @@ func cleanPrompt(prompt string) string {
 	s = strings.Trim(s, "_")
 
 	return s
+}
+
+// validateSuggestedName checks if a suggested name is usable
+func validateSuggestedName(name string) string {
+	// Clean the name using same rules as prompts
+	cleaned := cleanPrompt(name)
+
+	// Must have at least one letter
+	hasLetter := false
+	for _, c := range cleaned {
+		if c >= 'a' && c <= 'z' {
+			hasLetter = true
+			break
+		}
+	}
+
+	// Valid if 1-50 chars and has a letter
+	if len(cleaned) >= 1 && len(cleaned) <= 50 && hasLetter {
+		return cleaned
+	}
+
+	return ""
 }
 
 // EnsureUniqueFilename checks if a file exists and adds a counter if needed
