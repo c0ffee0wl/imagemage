@@ -190,27 +190,27 @@ func FindClosestAspectRatio(width, height int) string {
 }
 
 // GenerateContent sends a request to generate content
-func (c *Client) GenerateContent(prompt string) (string, error) {
+func (c *Client) GenerateContent(prompt string) (GenerateResult, error) {
 	return c.GenerateContentWithOptions(prompt, "", "")
 }
 
 // GenerateContentWithImage sends a request to generate or edit content with an optional image
-func (c *Client) GenerateContentWithImage(prompt string, imageBase64 string) (string, error) {
+func (c *Client) GenerateContentWithImage(prompt string, imageBase64 string) (GenerateResult, error) {
 	return c.GenerateContentWithImages(prompt, []string{imageBase64}, "")
 }
 
 // GenerateContentWithImages sends a request with multiple input images
-func (c *Client) GenerateContentWithImages(prompt string, imagesBase64 []string, aspectRatio string) (string, error) {
+func (c *Client) GenerateContentWithImages(prompt string, imagesBase64 []string, aspectRatio string) (GenerateResult, error) {
 	return c.GenerateContentWithFullOptions(prompt, imagesBase64, "", aspectRatio)
 }
 
 // GenerateContentWithResolution sends a request with resolution and aspect ratio
-func (c *Client) GenerateContentWithResolution(prompt string, resolution string, aspectRatio string) (string, error) {
+func (c *Client) GenerateContentWithResolution(prompt string, resolution string, aspectRatio string) (GenerateResult, error) {
 	return c.GenerateContentWithFullOptions(prompt, nil, resolution, aspectRatio)
 }
 
 // GenerateContentWithOptions sends a request to generate or edit content with full options
-func (c *Client) GenerateContentWithOptions(prompt string, imageBase64 string, aspectRatio string) (string, error) {
+func (c *Client) GenerateContentWithOptions(prompt string, imageBase64 string, aspectRatio string) (GenerateResult, error) {
 	var images []string
 	if imageBase64 != "" {
 		images = []string{imageBase64}
