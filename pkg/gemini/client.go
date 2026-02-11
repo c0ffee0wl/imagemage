@@ -15,6 +15,7 @@ const (
 	ModelName       = "gemini-3-pro-image-preview"
 	ModelNameFrugal = "gemini-2.5-flash-image"
 	BaseURL         = "https://generativelanguage.googleapis.com/v1beta/models"
+	FilenameSuffix  = "\n\nAfter generating the image, respond with a short (2-4 word) evocative filename for it. Just the words, no extension."
 )
 
 // Supported aspect ratios for Gemini image models
@@ -218,13 +219,14 @@ func (c *Client) GenerateContentWithOptions(prompt string, imageBase64 string, a
 }
 
 // GenerateContentWithFullOptions sends a request with all options including multiple images
-func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []string, resolution string, aspectRatio string) (string, error) {
+func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []string, resolution string, aspectRatio string) (GenerateResult, error) {
 	// Validate aspect ratio
 	if err := ValidateAspectRatio(aspectRatio); err != nil {
-		return "", err
+		return GenerateResult{}, err
 	}
+	fullPrompt := prompt + FilenameSuffix
 	parts := []Part{
-		{Text: prompt},
+		{Text: fullPrompt},
 	}
 
 	// Add images if provided (for editing/composition)
@@ -270,7 +272,7 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return GenerateResult{}, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Debug: Print request body if DEBUG env var is set
@@ -297,20 +299,20 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 	}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return GenerateResult{}, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to send request: %w", err)
+		return GenerateResult{}, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		return GenerateResult{}, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	// Debug: Print response if DEBUG env var is set
@@ -320,25 +322,25 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", c.handleError(resp.StatusCode, body)
+		return GenerateResult{}, c.handleError(resp.StatusCode, body)
 	}
 
 	var result GenerateResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+		return GenerateResult{}, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	if result.Error != nil {
-		return "", fmt.Errorf("API error (%d): %s", result.Error.Code, result.Error.Message)
+		return GenerateResult{}, fmt.Errorf("API error (%d): %s", result.Error.Code, result.Error.Message)
 	}
 
-	// Extract image data from response
-	genResult := c.extractResult(&result)
-	if genResult.ImageData == "" {
-		return "", fmt.Errorf("no image data found in response")
+	// Extract image data and suggested filename from response
+	res := c.extractResult(&result)
+	if res.ImageData == "" {
+		return GenerateResult{}, fmt.Errorf("no image data found in response")
 	}
 
-	return genResult.ImageData, nil
+	return res, nil
 }
 
 // extractResult extracts base64 image data and suggested filename from the response
