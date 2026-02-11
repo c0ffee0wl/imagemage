@@ -58,10 +58,11 @@ func TestClient_UsesSpecifiedModel(t *testing.T) {
 			}
 
 			// Make a request
-			_, err := client.GenerateContent("test prompt")
+			result, err := client.GenerateContent("test prompt")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			_ = result // silence unused variable warning
 
 			// Verify the correct model was used in the URL
 			expectedPath := "/" + tt.expectedModel + ":generateContent"
@@ -132,10 +133,11 @@ func TestClient_UsesImageResolution(t *testing.T) {
 			}
 
 			// Make a request with resolution
-			_, err := client.GenerateContentWithResolution("test prompt", tt.resolution, "")
+			result, err := client.GenerateContentWithResolution("test prompt", tt.resolution, "")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			_ = result // silence unused variable warning
 
 			// Parse the request body to verify resolution was set correctly
 			var req GenerateRequest
@@ -224,10 +226,11 @@ func TestFrugalClient_OmitsImageSize(t *testing.T) {
 			}
 
 			// Make a request with or without resolution
-			_, err := client.GenerateContentWithResolution("test prompt", tt.resolution, "")
+			result, err := client.GenerateContentWithResolution("test prompt", tt.resolution, "")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			_ = result // silence unused variable warning
 
 			// Parse the request body to verify resolution was set correctly
 			var req GenerateRequest
