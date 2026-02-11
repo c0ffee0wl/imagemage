@@ -92,6 +92,12 @@ type ErrorInfo struct {
 	Status  string `json:"status"`
 }
 
+// GenerateResult contains both image data and AI-suggested filename
+type GenerateResult struct {
+	ImageData     string // base64 encoded image
+	SuggestedName string // AI-suggested filename (may be empty)
+}
+
 // NewClient creates a new Gemini API client with the default model
 func NewClient() (*Client, error) {
 	return NewClientWithModel(ModelName)
@@ -327,36 +333,35 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 	}
 
 	// Extract image data from response
-	imageData := c.extractImageData(&result)
-	if imageData == "" {
+	genResult := c.extractResult(&result)
+	if genResult.ImageData == "" {
 		return "", fmt.Errorf("no image data found in response")
 	}
 
-	return imageData, nil
+	return genResult.ImageData, nil
 }
 
-// extractImageData extracts base64 image data from the response
-func (c *Client) extractImageData(result *GenerateResponse) string {
+// extractResult extracts base64 image data and suggested filename from the response
+func (c *Client) extractResult(result *GenerateResponse) GenerateResult {
+	var res GenerateResult
 	if len(result.Candidates) == 0 {
-		return ""
+		return res
 	}
 
 	for _, part := range result.Candidates[0].Content.Parts {
-		// Check for inline data (preferred)
+		// Check for inline data (image)
 		if part.InlineData != nil && part.InlineData.Data != "" {
-			return part.InlineData.Data
+			res.ImageData = part.InlineData.Data
 		}
 
-		// Fallback to text field (validate it's base64 and long enough)
-		if part.Text != "" && len(part.Text) > 1000 {
-			// Simple validation that it looks like base64
-			if !strings.Contains(part.Text, " ") && !strings.Contains(part.Text, "\n") {
-				return part.Text
-			}
+		// Check for text (suggested filename)
+		if part.Text != "" && len(part.Text) < 100 {
+			// Only use text if it looks like a filename suggestion (short)
+			res.SuggestedName = part.Text
 		}
 	}
 
-	return ""
+	return res
 }
 
 // handleError handles API errors and returns user-friendly messages
