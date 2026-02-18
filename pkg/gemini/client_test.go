@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -254,5 +255,95 @@ func TestFrugalClient_OmitsImageSize(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNewClientWithOptions_BearerAuth(t *testing.T) {
+	var requestedURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestedURL = r.URL.String()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"candidates": [{
+				"content": {
+					"parts": [{
+						"inlineData": {
+							"mimeType": "image/png",
+							"data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+						}
+					}]
+				}
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClientWithOptions("test-model", WithHTTPClient(&http.Client{}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	client.baseURL = server.URL
+
+	_, err = client.GenerateContent("hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(requestedURL, "key=") {
+		t.Errorf("bearer auth URL should not contain ?key=, got %q", requestedURL)
+	}
+	expectedPath := "/test-model:generateContent"
+	if requestedURL != expectedPath {
+		t.Errorf("expected URL %q, got %q", expectedPath, requestedURL)
+	}
+}
+
+func TestNewClientWithOptions_FallsBackToAPIKey(t *testing.T) {
+	t.Setenv("NANOBANANA_GEMINI_API_KEY", "")
+	t.Setenv("NANOBANANA_GOOGLE_API_KEY", "")
+	t.Setenv("GEMINI_API_KEY", "")
+	t.Setenv("GOOGLE_API_KEY", "")
+
+	_, err := NewClientWithOptions("test-model")
+	if err == nil {
+		t.Fatal("expected error when no API key and no WithHTTPClient")
+	}
+}
+
+func TestNewClientWithOptions_WithAPIKey(t *testing.T) {
+	t.Setenv("GEMINI_API_KEY", "test-key-123")
+
+	var requestedURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestedURL = r.URL.String()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"candidates": [{
+				"content": {
+					"parts": [{
+						"inlineData": {
+							"mimeType": "image/png",
+							"data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+						}
+					}]
+				}
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClientWithOptions("test-model")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	client.baseURL = server.URL
+
+	_, err = client.GenerateContent("hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(requestedURL, "key=test-key-123") {
+		t.Errorf("API key path should contain ?key=, got %q", requestedURL)
 	}
 }

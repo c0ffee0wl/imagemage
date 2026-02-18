@@ -34,10 +34,44 @@ var SupportedAspectRatios = []string{
 
 // Client represents a Gemini API client
 type Client struct {
-	apiKey     string
-	httpClient *http.Client
-	model      string
-	baseURL    string
+	apiKey        string
+	httpClient    *http.Client
+	model         string
+	baseURL       string
+	useBearerAuth bool
+}
+
+// ClientOption configures a Client.
+type ClientOption func(*Client)
+
+// WithHTTPClient sets a custom http.Client (e.g. one whose Transport
+// injects an Authorization: Bearer header for service-account auth).
+func WithHTTPClient(c *http.Client) ClientOption {
+	return func(cl *Client) {
+		cl.httpClient = c
+		cl.useBearerAuth = true
+	}
+}
+
+// NewClientWithOptions creates a Gemini client for the given model.
+// When WithHTTPClient is provided, the API key requirement is skipped
+// because the supplied transport handles authentication.
+func NewClientWithOptions(model string, opts ...ClientOption) (*Client, error) {
+	c := &Client{
+		httpClient: &http.Client{Timeout: 5 * time.Minute},
+		model:      model,
+		baseURL:    BaseURL,
+	}
+	for _, o := range opts {
+		o(c)
+	}
+	if !c.useBearerAuth {
+		c.apiKey = getAPIKey()
+		if c.apiKey == "" {
+			return nil, fmt.Errorf("API key not found. Please set one of: NANOBANANA_GEMINI_API_KEY, NANOBANANA_GOOGLE_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY")
+		}
+	}
+	return c, nil
 }
 
 // GenerateRequest represents a request to generate content
@@ -290,11 +324,18 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 		baseURL = BaseURL
 	}
 
-	url := fmt.Sprintf("%s/%s:generateContent?key=%s", baseURL, model, c.apiKey)
+	var url string
+	if c.useBearerAuth {
+		url = fmt.Sprintf("%s/%s:generateContent", baseURL, model)
+	} else {
+		url = fmt.Sprintf("%s/%s:generateContent?key=%s", baseURL, model, c.apiKey)
+	}
 
-	// Debug: Print URL (without API key) if DEBUG env var is set
 	if os.Getenv("DEBUG") != "" {
-		debugURL := fmt.Sprintf("%s/%s:generateContent?key=REDACTED", baseURL, model)
+		debugURL := url
+		if !c.useBearerAuth {
+			debugURL = fmt.Sprintf("%s/%s:generateContent?key=REDACTED", baseURL, model)
+		}
 		fmt.Fprintf(os.Stderr, "DEBUG: Request URL: %s\n", debugURL)
 	}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
