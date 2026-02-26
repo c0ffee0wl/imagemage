@@ -30,7 +30,7 @@ var generateCmd = &cobra.Command{
 	Long: `Generate one or more images from a text prompt using Google's Gemini image models.
 
 By default, uses Gemini 3 Pro Image (gemini-3-pro-image-preview) for high-quality 4K generation.
-Use --frugal flag to switch to Gemini 2.5 Flash Image (gemini-2.5-flash-image) for faster, cheaper generation.
+Use --frugal flag to switch to Nano Banana 2 (gemini-3.1-flash-image-preview) for Pro quality at Flash speed.
 
 Examples:
   imagemage generate "watercolor painting of a fox in snowy forest"
@@ -51,8 +51,8 @@ func init() {
 	generateCmd.Flags().StringVarP(&generateStyle, "style", "s", "", "Additional style guidance (e.g., 'watercolor', 'pixel-art')")
 	generateCmd.Flags().BoolVarP(&generatePreview, "preview", "p", false, "Show preview information")
 	generateCmd.Flags().StringVarP(&generateAspectRatio, "aspect-ratio", "a", "", "Aspect ratio (1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 21:9, 5:4, 4:5)")
-	generateCmd.Flags().StringVarP(&generateResolution, "resolution", "r", "", "Image resolution (1K, 2K, 4K). Defaults to 4K for Pro model, 1K for --frugal")
-	generateCmd.Flags().BoolVarP(&generateFrugal, "frugal", "f", false, "Use the cheaper gemini-2.5-flash-image model")
+	generateCmd.Flags().StringVarP(&generateResolution, "resolution", "r", "", "Image resolution (512px, 1K, 2K, 4K). Defaults to 4K")
+	generateCmd.Flags().BoolVarP(&generateFrugal, "frugal", "f", false, "Use Nano Banana 2 (faster, cheaper, still supports 4K)")
 	generateCmd.Flags().BoolVar(&generateSlide, "slide", false, "Optimize for presentation slides (4K, 16:9, with theme from config)")
 	generateCmd.Flags().StringVar(&generateConfig, "config", "", "Path to config file (JSON) with style, colorScheme, additionalContext")
 	generateCmd.Flags().BoolVar(&generateForce, "force", false, "Overwrite existing files without confirmation")
@@ -99,16 +99,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Validate frugal mode limitations (Gemini 2.5 Flash has fixed 1024px output)
-	if generateFrugal {
-		if generateSlide {
-			return fmt.Errorf("--frugal mode is incompatible with --slide (which requires 4K resolution). Gemini 2.5 Flash has fixed 1024px output")
-		}
-		if generateResolution != "" {
-			return fmt.Errorf("--frugal mode has fixed 1024px output and does not accept --resolution parameter. Gemini 2.5 Flash always outputs at 1024px. Remove --resolution or --frugal flag")
-		}
-	}
-
 	// Build full prompt with style and config
 	fullPrompt := prompt
 	if generateStyle != "" {
@@ -146,17 +136,13 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Aspect Ratio: %s\n", generateAspectRatio)
 	}
 	// Display resolution info
-	if generateFrugal {
-		fmt.Printf("Resolution: 1024px (fixed)\n")
-	} else {
-		resolution := generateResolution
-		if resolution == "" {
-			resolution = "4K"
-		}
-		fmt.Printf("Resolution: %s\n", resolution)
+	resolution := generateResolution
+	if resolution == "" {
+		resolution = "4K"
 	}
+	fmt.Printf("Resolution: %s\n", resolution)
 	if generateFrugal {
-		fmt.Printf("Model: %s (frugal)\n", gemini.ModelNameFrugal)
+		fmt.Printf("Model: %s (Nano Banana 2)\n", gemini.ModelNameFrugal)
 	} else {
 		fmt.Printf("Model: %s\n", gemini.ModelName)
 	}

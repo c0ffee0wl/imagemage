@@ -9,7 +9,7 @@ So here's Imagemage: a focused CLI tool that does exactly one thing - talks to G
 Imagemage lets you generate and edit images using Google's Gemini models without requiring their official CLI or any of its questionable architectural decisions. You get:
 
 - **Gemini 3 Pro Image** (default) - The good stuff: high-quality 4K generation
-- **Gemini 2.5 Flash Image** (`--frugal`) - For when you're watching your API budget and don't need every pixel perfect
+- **Nano Banana 2** (`--frugal`) - Pro quality at Flash speed, still supports 4K
 
 ## What You Can Do With This Thing
 

@@ -75,7 +75,7 @@ func runIcon(cmd *cobra.Command, args []string) error {
 	// Create enhanced prompt for icon generation
 	prompt := fmt.Sprintf("Create a clean, professional %s icon: %s. The icon should be simple, recognizable, and work well at small sizes. Use a square 1:1 aspect ratio. Center the icon on a transparent or solid background.", iconType, description)
 
-	// Use frugal model - 1024px is plenty for icons and much cheaper
+	// Use Nano Banana 2 - fast and cheap, 1024px base is plenty for icons
 	client, err := gemini.NewFrugalClient()
 	if err != nil {
 		return fmt.Errorf("failed to create Gemini client: %w", err)
@@ -84,7 +84,7 @@ func runIcon(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Generating icon: %s\n", description)
 	fmt.Printf("Type: %s\n", iconType)
 	fmt.Printf("Sizes: %v\n", sizes)
-	fmt.Printf("Model: %s (1024px base, then downscaled)\n", gemini.ModelNameFrugal)
+	fmt.Printf("Model: %s (Nano Banana 2, then downscaled)\n", gemini.ModelNameFrugal)
 	fmt.Println()
 
 	fmt.Println("Generating base icon...")

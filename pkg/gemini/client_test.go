@@ -157,40 +157,41 @@ func TestClient_UsesImageResolution(t *testing.T) {
 	}
 }
 
-func TestFrugalClient_OmitsImageSize(t *testing.T) {
+func TestClient_ImageSizeHandling(t *testing.T) {
 	tests := []struct {
 		name               string
 		model              string
 		resolution         string
-		expectImageSize    bool
 		expectedResolution string
 	}{
 		{
-			name:               "frugal model omits imageSize (fixed 1024px output)",
+			name:               "frugal model (Nano Banana 2) defaults to 4K",
 			model:              ModelNameFrugal,
 			resolution:         "",
-			expectImageSize:    false,
-			expectedResolution: "",
+			expectedResolution: "4K",
+		},
+		{
+			name:               "frugal model respects explicit 2K",
+			model:              ModelNameFrugal,
+			resolution:         "2K",
+			expectedResolution: "2K",
 		},
 		{
 			name:               "pro model defaults to 4K when no resolution specified",
 			model:              ModelName,
 			resolution:         "",
-			expectImageSize:    true,
 			expectedResolution: "4K",
 		},
 		{
 			name:               "pro model respects explicit 2K",
 			model:              ModelName,
 			resolution:         "2K",
-			expectImageSize:    true,
 			expectedResolution: "2K",
 		},
 		{
 			name:               "pro model respects explicit 4K",
 			model:              ModelName,
 			resolution:         "4K",
-			expectImageSize:    true,
 			expectedResolution: "4K",
 		},
 	}
@@ -244,15 +245,8 @@ func TestFrugalClient_OmitsImageSize(t *testing.T) {
 				t.Fatal("expected ImageConfig to be set")
 			}
 
-			if tt.expectImageSize {
-				if req.GenerationConfig.ImageConfig.ImageSize != tt.expectedResolution {
-					t.Errorf("expected resolution %q, got %q", tt.expectedResolution, req.GenerationConfig.ImageConfig.ImageSize)
-				}
-			} else {
-				// Frugal model should not have ImageSize set (fixed 1024px output)
-				if req.GenerationConfig.ImageConfig.ImageSize != "" {
-					t.Errorf("frugal model should not send imageSize parameter, but got %q", req.GenerationConfig.ImageConfig.ImageSize)
-				}
+			if req.GenerationConfig.ImageConfig.ImageSize != tt.expectedResolution {
+				t.Errorf("expected resolution %q, got %q", tt.expectedResolution, req.GenerationConfig.ImageConfig.ImageSize)
 			}
 		})
 	}

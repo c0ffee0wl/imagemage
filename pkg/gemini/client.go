@@ -13,7 +13,7 @@ import (
 
 const (
 	ModelName       = "gemini-3-pro-image-preview"
-	ModelNameFrugal = "gemini-2.5-flash-image"
+	ModelNameFrugal = "gemini-3.1-flash-image-preview" // Nano Banana 2
 	BaseURL         = "https://generativelanguage.googleapis.com/v1beta/models"
 	FilenameSuffix  = "\n\nAfter generating the image, respond with a short (2-4 word) evocative filename for it. Just the words, no extension."
 )
@@ -30,6 +30,10 @@ var SupportedAspectRatios = []string{
 	"21:9", // Ultra-wide
 	"5:4",  // Flexible
 	"4:5",  // Flexible
+	"4:1",  // Extreme panorama (Nano Banana 2)
+	"1:4",  // Extreme vertical (Nano Banana 2)
+	"8:1",  // Ultra panorama (Nano Banana 2)
+	"1:8",  // Ultra vertical (Nano Banana 2)
 }
 
 // Client represents a Gemini API client
@@ -285,20 +289,16 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 	}
 
 	// Configure image generation based on model capabilities
+	// Both Pro and Nano Banana 2 (frugal) support 512px, 1K, 2K, 4K
 	imageConfig := &ImageConfig{
 		AspectRatio: aspectRatio,
 	}
 
-	// Frugal model (2.5 Flash) has fixed 1024px output and doesn't accept imageSize parameter
-	// Pro model supports 1K, 2K, 4K via imageSize parameter
-	if c.model != ModelNameFrugal {
-		imageSize := resolution
-		if imageSize == "" {
-			imageSize = "4K" // Pro model default
-		}
-		imageConfig.ImageSize = imageSize
+	imageSize := resolution
+	if imageSize == "" {
+		imageSize = "4K" // Default to highest quality
 	}
-	// For frugal model, omit ImageSize entirely (fixed 1024px output)
+	imageConfig.ImageSize = imageSize
 
 	reqBody.GenerationConfig = &GenerationConfig{
 		ImageConfig: imageConfig,

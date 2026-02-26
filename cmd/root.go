@@ -23,7 +23,7 @@ var rootCmd = &cobra.Command{
 
 Supports multiple Gemini models:
   • Gemini 3 Pro Image (default) - High-quality 4K generation
-  • Gemini 2.5 Flash Image (--frugal) - Faster, cheaper generation
+  • Nano Banana 2 (--frugal) - Pro quality at Flash speed
 
 Features include text-to-image creation, image editing, photo restoration, icon generation,
 pattern creation, visual narratives, and technical diagrams.`,

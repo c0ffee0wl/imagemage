@@ -51,8 +51,8 @@ func init() {
 	editCmd.Flags().StringVarP(&editOutput, "output", "o", "", "Output path for edited image (default: base-image-edited.png)")
 	editCmd.Flags().StringArrayVarP(&editInputs, "input", "i", []string{}, "Additional input images for composition (can be used multiple times)")
 	editCmd.Flags().StringVarP(&editAspectRatio, "aspect-ratio", "a", "", "Aspect ratio for output (auto-detected from input if not specified)")
-	editCmd.Flags().StringVarP(&editResolution, "resolution", "r", "", "Image resolution (1K, 2K, 4K). Defaults to 4K for Pro model, 1K for --frugal")
-	editCmd.Flags().BoolVarP(&editFrugal, "frugal", "f", false, "Use the cheaper gemini-2.5-flash-image model")
+	editCmd.Flags().StringVarP(&editResolution, "resolution", "r", "", "Image resolution (512px, 1K, 2K, 4K). Defaults to 4K")
+	editCmd.Flags().BoolVarP(&editFrugal, "frugal", "f", false, "Use Nano Banana 2 (faster, cheaper, still supports 4K)")
 	editCmd.Flags().BoolVar(&editForce, "force", false, "Overwrite output file if it exists")
 	editCmd.Flags().BoolVar(&editStorePrompt, "store-prompt", false, "Store instruction in PNG metadata")
 }
@@ -116,16 +116,6 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Validate frugal mode limitations (Gemini 2.5 Flash has fixed 1024px output)
-	if editFrugal {
-		if editResolution != "" {
-			return fmt.Errorf("--frugal mode has fixed 1024px output and does not accept --resolution parameter. Gemini 2.5 Flash always outputs at 1024px. Remove --resolution or --frugal flag")
-		}
-		if totalImages > 1 {
-			fmt.Printf("⚠️  Warning: Multi-image composition with --frugal mode may have limitations. Gemini 2.5 Flash multi-image capabilities are not well documented. For best results with %d images, consider using Gemini 3 Pro (remove --frugal flag).\n\n", totalImages)
-		}
-	}
-
 	fmt.Printf("Loading base image: %s\n", filepath.Base(baseImagePath))
 
 	// Load and encode base image
@@ -172,17 +162,13 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// Display resolution info
-	if editFrugal {
-		fmt.Printf("Resolution: 1024px (fixed)\n")
-	} else {
-		resolution := editResolution
-		if resolution == "" {
-			resolution = "4K"
-		}
-		fmt.Printf("Resolution: %s\n", resolution)
+	resolution := editResolution
+	if resolution == "" {
+		resolution = "4K"
 	}
+	fmt.Printf("Resolution: %s\n", resolution)
 	if editFrugal {
-		fmt.Printf("Model: %s (frugal)\n", gemini.ModelNameFrugal)
+		fmt.Printf("Model: %s (Nano Banana 2)\n", gemini.ModelNameFrugal)
 	} else {
 		fmt.Printf("Model: %s\n", gemini.ModelName)
 	}
