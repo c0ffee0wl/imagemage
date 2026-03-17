@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	ModelName       = "gemini-3-pro-image-preview"
+	ModelName       = "gemini-3.1-pro-image-preview"
 	ModelNameFrugal = "gemini-3.1-flash-image-preview" // Nano Banana 2
 	BaseURL         = "https://generativelanguage.googleapis.com/v1beta/models"
 	FilenameSuffix  = "\n\nAfter generating the image, respond with a short (2-4 word) evocative filename for it. Just the words, no extension."
