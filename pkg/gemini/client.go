@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	ModelName       = "gemini-3.1-pro-image-preview"
+	ModelName       = "gemini-3-pro-image-preview"
 	ModelNameFrugal = "gemini-3.1-flash-image-preview" // Nano Banana 2
 	BaseURL         = "https://generativelanguage.googleapis.com/v1beta/models"
 	FilenameSuffix  = "\n\nAfter generating the image, respond with a short (2-4 word) evocative filename for it. Just the words, no extension."
@@ -86,7 +86,8 @@ type GenerateRequest struct {
 
 // GenerationConfig represents generation configuration
 type GenerationConfig struct {
-	ImageConfig *ImageConfig `json:"imageConfig,omitempty"`
+	ResponseModalities []string     `json:"responseModalities,omitempty"`
+	ImageConfig        *ImageConfig `json:"imageConfig,omitempty"`
 }
 
 // ImageConfig represents image-specific configuration
@@ -301,7 +302,8 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 	imageConfig.ImageSize = imageSize
 
 	reqBody.GenerationConfig = &GenerationConfig{
-		ImageConfig: imageConfig,
+		ResponseModalities: []string{"TEXT", "IMAGE"},
+		ImageConfig:        imageConfig,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
