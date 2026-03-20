@@ -380,7 +380,19 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 	// Extract image data and suggested filename from response
 	res := c.extractResult(&result)
 	if res.ImageData == "" {
-		return GenerateResult{}, fmt.Errorf("no image data found in response")
+		// Collect all text parts so we can surface why Gemini refused
+		var textParts []string
+		if len(result.Candidates) > 0 {
+			for _, part := range result.Candidates[0].Content.Parts {
+				if part.Text != "" {
+					textParts = append(textParts, part.Text)
+				}
+			}
+		}
+		if len(textParts) > 0 {
+			return GenerateResult{}, fmt.Errorf("no image data found in response (model said: %s)", strings.Join(textParts, " | "))
+		}
+		return GenerateResult{}, fmt.Errorf("no image data found in response (empty candidates)")
 	}
 
 	return res, nil
