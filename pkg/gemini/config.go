@@ -5,7 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+// ensureTerminated trims trailing whitespace from s and, if the result does
+// not already end in sentence-terminating punctuation, appends a period.
+// An empty string is returned unchanged.
+func ensureTerminated(s string) string {
+	s = strings.TrimRight(s, " \t\r\n")
+	if s == "" {
+		return s
+	}
+	switch s[len(s)-1] {
+	case '.', '!', '?':
+		return s
+	}
+	return s + "."
+}
 
 // ImageConfig represents configuration for image generation
 type ImageGenConfig struct {
@@ -84,21 +100,21 @@ func (c *ImageGenConfig) ApplyToPrompt(prompt string) string {
 		return prompt
 	}
 
-	fullPrompt := prompt
+	fullPrompt := ensureTerminated(prompt)
 
-	// Add style
 	if c.Defaults.Style != "" {
-		fullPrompt = fmt.Sprintf("%s, %s", fullPrompt, c.Defaults.Style)
+		fullPrompt = fmt.Sprintf("%s Rendered in %s", fullPrompt, ensureTerminated(c.Defaults.Style))
 	}
 
-	// Add color scheme
 	if c.Defaults.ColorScheme != "" {
-		fullPrompt = fmt.Sprintf("%s, colors: %s", fullPrompt, c.Defaults.ColorScheme)
+		fullPrompt = fmt.Sprintf("%s Color palette: %s", fullPrompt, ensureTerminated(c.Defaults.ColorScheme))
 	}
 
-	// Add additional context
 	if c.Defaults.AdditionalContext != "" {
-		fullPrompt = fmt.Sprintf("%s, %s", fullPrompt, c.Defaults.AdditionalContext)
+		ctx := strings.TrimRight(c.Defaults.AdditionalContext, " \t\r\n")
+		if ctx != "" {
+			fullPrompt = fmt.Sprintf("%s %s", fullPrompt, ctx)
+		}
 	}
 
 	return fullPrompt

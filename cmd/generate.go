@@ -19,7 +19,7 @@ const maxReferenceImages = 4
 
 const refPayloadWarnBytes = 20 * 1024 * 1024
 
-const refStyleHint = "Use the attached reference image(s) as the authoritative visual style guide: match their color palette, iconography, line weight, layout density, and overall aesthetic. Do not copy specific content — only style.\n\n"
+const refStyleHint = "Use the attached reference image(s) strictly as a visual style guide: match their color palette, iconography vocabulary, line weight, layout density, typography, and overall aesthetic. Do not reproduce their specific subject matter, labels, or text — apply the style to the subject described in the prompt below.\n\n"
 
 var (
 	generateCount       int
