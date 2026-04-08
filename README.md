@@ -118,6 +118,7 @@ imagemage generate "concept art" --frugal --count=5
 - `-a, --aspect-ratio` - Aspect ratio (1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 21:9, 5:4, 4:5)
 - `-f, --frugal` - Use the cheaper Flash model instead of Pro (your wallet will thank you)
 - `--slide` - Optimized for presentation slides (4K, 16:9)
+- `--ref` - Reference image(s) for style grounding (repeatable or comma-separated, PNG/JPG/WebP, max 4)
 - `--store-prompt` - Save the prompt in the image metadata (for reproducibility)
 
 **Supported Aspect Ratios:**
@@ -127,6 +128,37 @@ imagemage generate "concept art" --frugal --count=5
 - **Other:** 5:4, 4:5 - For the rebels among us
 
 **Pro tip:** Use the `--aspect-ratio` flag instead of mentioning dimensions in your prompt. The model is terrible at understanding "make it 1920x1080" but great at understanding `--aspect-ratio="16:9"`.
+
+### Reference Images
+
+Text prompts alone can't reliably pin down a specific house style. When you need the output to match an existing look — slide decks, brand guidelines, a recurring illustration vocabulary — attach one or more **reference images** with `--ref`. The images are sent to Gemini as multimodal input alongside your prompt and treated as a style anchor (palette, iconography, line weight, layout density), not as content to copy.
+
+```bash
+# Single reference
+imagemage generate --slide --ref ./refs/house-style.png \
+  "horizontal process flow: initial access, privilege escalation, exfiltration"
+
+# Multiple references (repeatable or comma-separated)
+imagemage generate --slide \
+  --ref ./refs/09.png --ref ./refs/1055.png \
+  "network diagram with segmented zones"
+
+imagemage generate --slide --ref ./refs/09.png,./refs/1055.png "…"
+```
+
+You can also declare references in your JSON config so every generation inherits them. Relative paths resolve against the config file's directory, and any `--ref` on the CLI **appends to** (does not replace) the config list.
+
+```json
+{
+  "defaults": {
+    "aspectRatio": "16:9",
+    "resolution": "4K",
+    "references": ["refs/house-style-1.png", "refs/house-style-2.png"]
+  }
+}
+```
+
+**Rules:** PNG, JPG, or WebP only. Max 4 references per call. Each reference's path, MIME type, and size are logged to stderr when attached.
 
 ### Edit Command
 

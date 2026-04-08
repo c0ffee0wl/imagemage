@@ -1,14 +1,25 @@
 package cmd
 
 import (
+	"encoding/base64"
 	"fmt"
 	"imagemage/pkg/filehandler"
 	"imagemage/pkg/gemini"
 	"imagemage/pkg/metadata"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
+
+// Gemini 3 Pro Image accepts more, but 4 keeps inline payloads well under the
+// ~20MB threshold where Google recommends the Files API instead.
+const maxReferenceImages = 4
+
+const refPayloadWarnBytes = 20 * 1024 * 1024
+
+const refStyleHint = "Use the attached reference image(s) as the authoritative visual style guide: match their color palette, iconography, line weight, layout density, and overall aesthetic. Do not copy specific content — only style.\n\n"
 
 var (
 	generateCount       int
@@ -22,6 +33,7 @@ var (
 	generateConfig      string
 	generateForce       bool
 	generateStorePrompt bool
+	generateRefs        []string
 )
 
 var generateCmd = &cobra.Command{
@@ -38,7 +50,8 @@ Examples:
   imagemage generate "cyberpunk city" --style="neon, futuristic"
   imagemage generate "wide cinematic shot" --aspect-ratio="21:9"
   imagemage generate "phone wallpaper" --aspect-ratio="9:16"
-  imagemage generate "concept art" --frugal`,
+  imagemage generate "concept art" --frugal
+  imagemage generate "process flow diagram" --slide --ref ./refs/house-style.png`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runGenerate,
 }
@@ -57,6 +70,51 @@ func init() {
 	generateCmd.Flags().StringVar(&generateConfig, "config", "", "Path to config file (JSON) with style, colorScheme, additionalContext")
 	generateCmd.Flags().BoolVar(&generateForce, "force", false, "Overwrite existing files without confirmation")
 	generateCmd.Flags().BoolVar(&generateStorePrompt, "store-prompt", false, "Store prompt in PNG metadata for reproducibility")
+	generateCmd.Flags().StringSliceVar(&generateRefs, "ref", nil, "Reference image(s) for style grounding (repeatable, or comma-separated). PNG/JPG/WebP.")
+}
+
+func refMimeForPath(path string) (string, error) {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png":
+		return "image/png", nil
+	case ".jpg", ".jpeg":
+		return "image/jpeg", nil
+	case ".webp":
+		return "image/webp", nil
+	default:
+		return "", fmt.Errorf("unsupported reference image format %q (supported: .png, .jpg, .jpeg, .webp)", filepath.Ext(path))
+	}
+}
+
+func loadReferenceImages(paths []string) ([]gemini.RefImage, error) {
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	if len(paths) > maxReferenceImages {
+		return nil, fmt.Errorf("too many reference images: %d (max %d)", len(paths), maxReferenceImages)
+	}
+	refs := make([]gemini.RefImage, 0, len(paths))
+	var total int
+	for _, p := range paths {
+		mime, err := refMimeForPath(p)
+		if err != nil {
+			return nil, err
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return nil, fmt.Errorf("reference image %q: %w", p, err)
+		}
+		refs = append(refs, gemini.RefImage{
+			MimeType: mime,
+			Base64:   base64.StdEncoding.EncodeToString(data),
+		})
+		total += len(data)
+		fmt.Fprintf(os.Stderr, "[refs] attached %s (%s, %d bytes)\n", p, mime, len(data))
+	}
+	if total > refPayloadWarnBytes {
+		fmt.Fprintf(os.Stderr, "[refs] warning: total reference payload is %d bytes (>%d); consider fewer/smaller images\n", total, refPayloadWarnBytes)
+	}
+	return refs, nil
 }
 
 func runGenerate(cmd *cobra.Command, args []string) error {
@@ -110,6 +168,21 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		fullPrompt = config.ApplyToPrompt(fullPrompt)
 	}
 
+	// CLI --ref appends to config-declared references, not replace.
+	var refPaths []string
+	if config != nil {
+		refPaths = append(refPaths, config.GetReferences()...)
+	}
+	refPaths = append(refPaths, generateRefs...)
+
+	refs, err := loadReferenceImages(refPaths)
+	if err != nil {
+		return err
+	}
+	if len(refs) > 0 {
+		fullPrompt = refStyleHint + fullPrompt
+	}
+
 	// Create Gemini client (frugal or default)
 	var client *gemini.Client
 	if generateFrugal {
@@ -156,8 +229,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 			fmt.Println("Generating image...")
 		}
 
-		// Generate image with resolution support
-		result, err := client.GenerateContentWithResolution(fullPrompt, generateResolution, generateAspectRatio)
+		result, err := client.GenerateContentWithRefs(fullPrompt, refs, generateResolution, generateAspectRatio)
 		if err != nil {
 			fmt.Printf("Error generating image %d: %v\n", i, err)
 			continue

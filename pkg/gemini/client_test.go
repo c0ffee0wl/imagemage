@@ -74,6 +74,75 @@ func TestClient_UsesSpecifiedModel(t *testing.T) {
 	}
 }
 
+func TestClient_AttachesReferenceImages(t *testing.T) {
+	var receivedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"candidates": [{
+				"content": {
+					"parts": [{
+						"inlineData": {
+							"mimeType": "image/png",
+							"data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+						}
+					}]
+				}
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		apiKey:     "test-key",
+		httpClient: &http.Client{},
+		model:      "gemini-3-pro-image-preview",
+		baseURL:    server.URL,
+	}
+
+	pngB64 := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+	jpgB64 := "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8Afw=="
+	refs := []RefImage{
+		{MimeType: "image/png", Base64: pngB64},
+		{MimeType: "image/jpeg", Base64: jpgB64},
+	}
+
+	if _, err := client.GenerateContentWithRefs("test prompt", refs, "4K", "16:9"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var req GenerateRequest
+	if err := json.Unmarshal(receivedBody, &req); err != nil {
+		t.Fatalf("failed to unmarshal request body: %v", err)
+	}
+	if len(req.Contents) != 1 {
+		t.Fatalf("expected 1 content, got %d", len(req.Contents))
+	}
+	parts := req.Contents[0].Parts
+	if len(parts) != 3 {
+		t.Fatalf("expected 3 parts (1 text + 2 inline), got %d", len(parts))
+	}
+	if parts[0].Text == "" {
+		t.Errorf("expected first part to be text, got %+v", parts[0])
+	}
+	if parts[1].InlineData == nil || parts[1].InlineData.MimeType != "image/png" || parts[1].InlineData.Data != pngB64 {
+		t.Errorf("part 1 mismatch: %+v", parts[1].InlineData)
+	}
+	if parts[2].InlineData == nil || parts[2].InlineData.MimeType != "image/jpeg" || parts[2].InlineData.Data != jpgB64 {
+		t.Errorf("part 2 mismatch: %+v", parts[2].InlineData)
+	}
+	if req.GenerationConfig == nil || req.GenerationConfig.ImageConfig == nil {
+		t.Fatal("expected ImageConfig to be set")
+	}
+	if req.GenerationConfig.ImageConfig.AspectRatio != "16:9" {
+		t.Errorf("expected aspect 16:9, got %q", req.GenerationConfig.ImageConfig.AspectRatio)
+	}
+	if req.GenerationConfig.ImageConfig.ImageSize != "4K" {
+		t.Errorf("expected size 4K, got %q", req.GenerationConfig.ImageConfig.ImageSize)
+	}
+}
+
 func TestClient_UsesImageResolution(t *testing.T) {
 	tests := []struct {
 		name               string

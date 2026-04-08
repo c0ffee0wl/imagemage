@@ -257,66 +257,76 @@ func (c *Client) GenerateContentWithOptions(prompt string, imageBase64 string, a
 	return c.GenerateContentWithFullOptions(prompt, images, "", aspectRatio)
 }
 
-// GenerateContentWithFullOptions sends a request with all options including multiple images
-func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []string, resolution string, aspectRatio string) (GenerateResult, error) {
-	// Validate aspect ratio
+// RefImage is a typed reference image attached to a generation request.
+// Unlike the legacy imagesBase64 slice (which hardcodes image/png), RefImage
+// preserves the original MIME type so JPEG/WebP references are sent correctly.
+type RefImage struct {
+	MimeType string // e.g. "image/png", "image/jpeg", "image/webp"
+	Base64   string // base64-encoded image bytes
+}
+
+// GenerateContentWithRefs is the multimodal entry point used when callers
+// pass typed reference images (style anchors). It mirrors
+// GenerateContentWithFullOptions but builds inline image parts from []RefImage
+// so each image keeps its real MIME type.
+//
+// Note: as of Dec 2025, some developers report that imageConfig.imageSize="2K"
+// is intermittently ignored by gemini-3-pro-image-preview when reference
+// images are supplied. --slide uses 4K so this does not affect us today.
+// See https://discuss.ai.google.dev/t/110458
+func (c *Client) GenerateContentWithRefs(prompt string, refs []RefImage, resolution string, aspectRatio string) (GenerateResult, error) {
 	if err := ValidateAspectRatio(aspectRatio); err != nil {
 		return GenerateResult{}, err
 	}
 	fullPrompt := prompt + FilenameSuffix
-	parts := []Part{
-		{Text: fullPrompt},
-	}
-
-	// Add images if provided (for editing/composition)
-	for _, imageBase64 := range imagesBase64 {
-		if imageBase64 != "" {
-			parts = append(parts, Part{
-				InlineData: &InlineData{
-					MimeType: "image/png",
-					Data:     imageBase64,
-				},
-			})
+	parts := []Part{{Text: fullPrompt}}
+	for _, r := range refs {
+		if r.Base64 == "" {
+			continue
 		}
+		mt := r.MimeType
+		if mt == "" {
+			mt = "image/png"
+		}
+		parts = append(parts, Part{
+			InlineData: &InlineData{
+				MimeType: mt,
+				Data:     r.Base64,
+			},
+		})
 	}
 
 	reqBody := GenerateRequest{
-		Contents: []Content{
-			{
-				Role:  "user",
-				Parts: parts,
-			},
-		},
-	}
-
-	// Configure image generation based on model capabilities
-	// Both Pro and Nano Banana 2 (frugal) support 512px, 1K, 2K, 4K
-	imageConfig := &ImageConfig{
-		AspectRatio: aspectRatio,
+		Contents: []Content{{Role: "user", Parts: parts}},
 	}
 
 	imageSize := resolution
 	if imageSize == "" {
-		imageSize = "4K" // Default to highest quality
+		imageSize = "4K"
 	}
-	imageConfig.ImageSize = imageSize
-
 	reqBody.GenerationConfig = &GenerationConfig{
 		ResponseModalities: []string{"TEXT", "IMAGE"},
-		ImageConfig:        imageConfig,
+		ImageConfig: &ImageConfig{
+			AspectRatio: aspectRatio,
+			ImageSize:   imageSize,
+		},
 	}
 
+	return c.doGenerate(&reqBody)
+}
+
+// doGenerate marshals a prepared request, sends it, and parses the response.
+// Shared between GenerateContentWithFullOptions and GenerateContentWithRefs.
+func (c *Client) doGenerate(reqBody *GenerateRequest) (GenerateResult, error) {
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
 		return GenerateResult{}, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Debug: Print request body if DEBUG env var is set
 	if os.Getenv("DEBUG") != "" {
 		fmt.Fprintf(os.Stderr, "DEBUG: Request body:\n%s\n", string(jsonData))
 	}
 
-	// Use client's model and baseURL, falling back to defaults if not set
 	model := c.model
 	if model == "" {
 		model = ModelName
@@ -340,11 +350,11 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 		}
 		fmt.Fprintf(os.Stderr, "DEBUG: Request URL: %s\n", debugURL)
 	}
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return GenerateResult{}, fmt.Errorf("failed to create request: %w", err)
 	}
-
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
@@ -358,7 +368,6 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 		return GenerateResult{}, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	// Debug: Print response if DEBUG env var is set
 	if os.Getenv("DEBUG") != "" {
 		fmt.Fprintf(os.Stderr, "DEBUG: Response status: %d\n", resp.StatusCode)
 		fmt.Fprintf(os.Stderr, "DEBUG: Response body:\n%s\n", string(body))
@@ -372,15 +381,12 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 	if err := json.Unmarshal(body, &result); err != nil {
 		return GenerateResult{}, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
-
 	if result.Error != nil {
 		return GenerateResult{}, fmt.Errorf("API error (%d): %s", result.Error.Code, result.Error.Message)
 	}
 
-	// Extract image data and suggested filename from response
 	res := c.extractResult(&result)
 	if res.ImageData == "" {
-		// Collect all text parts so we can surface why Gemini refused
 		var textParts []string
 		if len(result.Candidates) > 0 {
 			for _, part := range result.Candidates[0].Content.Parts {
@@ -394,8 +400,20 @@ func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []st
 		}
 		return GenerateResult{}, fmt.Errorf("no image data found in response (empty candidates)")
 	}
-
 	return res, nil
+}
+
+// GenerateContentWithFullOptions sends a request with all options including
+// multiple images. Images in imagesBase64 are sent as image/png inline parts
+// (legacy behavior — use GenerateContentWithRefs for typed MIME types).
+func (c *Client) GenerateContentWithFullOptions(prompt string, imagesBase64 []string, resolution string, aspectRatio string) (GenerateResult, error) {
+	refs := make([]RefImage, 0, len(imagesBase64))
+	for _, b := range imagesBase64 {
+		if b != "" {
+			refs = append(refs, RefImage{MimeType: "image/png", Base64: b})
+		}
+	}
+	return c.GenerateContentWithRefs(prompt, refs, resolution, aspectRatio)
 }
 
 // extractResult extracts base64 image data and suggested filename from the response

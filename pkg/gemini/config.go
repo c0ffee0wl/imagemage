@@ -10,15 +10,20 @@ import (
 // ImageConfig represents configuration for image generation
 type ImageGenConfig struct {
 	Defaults ImageGenDefaults `json:"defaults"`
+
+	// configDir is the directory containing the loaded config file, used to
+	// resolve relative paths (e.g. references). Not serialized.
+	configDir string
 }
 
 // ImageGenDefaults represents default settings for image generation
 type ImageGenDefaults struct {
-	AspectRatio       string `json:"aspectRatio"`
-	Resolution        string `json:"resolution"`
-	Style             string `json:"style"`
-	ColorScheme       string `json:"colorScheme"`
-	AdditionalContext string `json:"additionalContext"`
+	AspectRatio       string   `json:"aspectRatio"`
+	Resolution        string   `json:"resolution"`
+	Style             string   `json:"style"`
+	ColorScheme       string   `json:"colorScheme"`
+	AdditionalContext string   `json:"additionalContext"`
+	References        []string `json:"references"`
 }
 
 // LoadConfig loads configuration from a file
@@ -31,6 +36,14 @@ func LoadConfig(configPath string) (*ImageGenConfig, error) {
 	var config ImageGenConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config JSON: %w", err)
+	}
+
+	// Record the directory so callers can resolve relative paths (e.g.
+	// references) against the config file's location rather than CWD.
+	if absPath, err := filepath.Abs(configPath); err == nil {
+		config.configDir = filepath.Dir(absPath)
+	} else {
+		config.configDir = filepath.Dir(configPath)
 	}
 
 	return &config, nil
@@ -105,4 +118,25 @@ func (c *ImageGenConfig) GetResolution() string {
 		return ""
 	}
 	return c.Defaults.Resolution
+}
+
+// GetReferences returns reference image paths from config, resolved against
+// the config file's directory when they are relative. Returns nil if the
+// config is nil or has no references.
+func (c *ImageGenConfig) GetReferences() []string {
+	if c == nil || len(c.Defaults.References) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(c.Defaults.References))
+	for _, ref := range c.Defaults.References {
+		if ref == "" {
+			continue
+		}
+		if filepath.IsAbs(ref) || c.configDir == "" {
+			out = append(out, ref)
+		} else {
+			out = append(out, filepath.Join(c.configDir, ref))
+		}
+	}
+	return out
 }
